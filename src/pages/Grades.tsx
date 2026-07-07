@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, ArrowUp, ArrowDown, ChevronsUpDown, ClipboardList } from 'lucide-react'
+import { Plus, ArrowUp, ArrowDown, ChevronsUpDown, ClipboardList, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import Navbar from '@/components/Navbar'
 import GradeFormModal, { type GradeInput } from '@/components/GradeFormModal'
 import { apiRequest } from '@/utils/api'
@@ -86,6 +87,30 @@ export default function Grades() {
     await load()
   }
 
+  /** 将当前表格（按当前排序）导出为 Excel 文件。 */
+  const handleExport = () => {
+    const data = sortedRows.map((row) => {
+      const record: Record<string, string | number> = {
+        学号: row.studentNo,
+        姓名: row.name,
+        性别: row.gender,
+        班级: row.className,
+      }
+      table.subjects.forEach((subject) => {
+        record[subject] = row.scores[subject] ?? ''
+      })
+      record['平均分'] = row.average ?? ''
+      return record
+    })
+
+    const header = ['学号', '姓名', '性别', '班级', ...table.subjects, '平均分']
+    const worksheet = XLSX.utils.json_to_sheet(data, { header })
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '成绩表')
+    const today = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(workbook, `成绩表_${today}.xlsx`)
+  }
+
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortKey !== column) return <ChevronsUpDown size={13} className="opacity-40" />
     return sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
@@ -125,11 +150,16 @@ export default function Grades() {
               点击表头可对任意列排序 · 共 {table.rows.length} 名学生 · {table.subjects.length} 门科目
             </p>
           </div>
-          {isAdmin && (
-            <button className="btn-accent" onClick={() => setModalOpen(true)}>
-              <Plus size={16} /> 录入成绩
+          <div className="flex items-center gap-3">
+            <button className="btn-primary" onClick={handleExport} disabled={table.rows.length === 0}>
+              <Download size={16} /> 导出成绩
             </button>
-          )}
+            {isAdmin && (
+              <button className="btn-accent" onClick={() => setModalOpen(true)}>
+                <Plus size={16} /> 录入成绩
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
