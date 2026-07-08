@@ -39,8 +39,8 @@ router.post('/register', (req: Request, res: Response): void => {
     return
   }
 
-  const users = store.getUsers()
-  if (users.some((u) => u.username === username.trim())) {
+  const existing = store.getUserByUsername(username.trim())
+  if (existing) {
     res.status(409).json({ success: false, error: '用户名已存在' })
     return
   }
@@ -53,8 +53,7 @@ router.post('/register', (req: Request, res: Response): void => {
     salt,
     role,
   }
-  users.push(user)
-  store.saveUsers(users)
+  store.createUser(user)
 
   const token = createSession(user.id)
   res.status(201).json({ success: true, token, user: publicUser(user) })
@@ -71,7 +70,7 @@ router.post('/login', (req: Request, res: Response): void => {
     return
   }
 
-  const user = store.getUsers().find((u) => u.username === username.trim())
+  const user = store.getUserByUsername(username.trim())
   if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
     res.status(401).json({ success: false, error: '用户名或密码错误' })
     return

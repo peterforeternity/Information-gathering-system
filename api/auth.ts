@@ -50,7 +50,7 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
     res.status(401).json({ success: false, error: '未登录或登录已失效' })
     return
   }
-  const user = store.getUsers().find((u) => u.id === userId)
+  const user = store.getUserById(userId)
   if (!user) {
     res.status(401).json({ success: false, error: '用户不存在' })
     return

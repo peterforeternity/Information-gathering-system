@@ -2,8 +2,7 @@
  * 成绩管理 API：录入/更新成绩、查询聚合成绩表、查询科目列表。仅管理员可写。
  */
 import { Router, type Response } from 'express'
-import crypto from 'crypto'
-import { store, type Grade } from '../store.js'
+import { store } from '../store.js'
 import { requireAuth, requireAdmin, type AuthedRequest } from '../auth.js'
 
 const router = Router()
@@ -70,26 +69,12 @@ router.post('/', requireAdmin, (req: AuthedRequest, res: Response): void => {
     res.status(400).json({ success: false, error: '分数必须在 0-100 之间' })
     return
   }
-  if (!store.getStudents().some((s) => s.id === studentId)) {
+  if (!store.getStudentById(studentId)) {
     res.status(404).json({ success: false, error: '学生不存在' })
     return
   }
 
-  const grades = store.getGrades()
-  const trimmedSubject = subject.trim()
-  const existing = grades.find((g) => g.studentId === studentId && g.subject === trimmedSubject)
-  if (existing) {
-    existing.score = numScore
-  } else {
-    const grade: Grade = {
-      id: crypto.randomUUID(),
-      studentId,
-      subject: trimmedSubject,
-      score: numScore,
-    }
-    grades.push(grade)
-  }
-  store.saveGrades(grades)
+  store.upsertGrade(studentId, subject.trim(), numScore)
   res.status(201).json({ success: true })
 })
 

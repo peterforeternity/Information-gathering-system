@@ -7,13 +7,15 @@
 - **用户认证**：注册（管理员 / 学生角色）、登录、登出；密码使用 scrypt 加盐哈希存储，会话基于 token。
 - **学生管理**（管理员）：学生信息的新增、编辑、删除，学号唯一校验，删除时级联清除其成绩。
 - **成绩管理**：成绩录入（0–100 校验，同一学生同科目自动覆盖更新）；表格展示所有学生各科成绩与平均分，支持按任意列排序；学生角色可只读查看。
-- **数据持久化**：数据以 JSON 文件存储于本地 `data/` 目录，采用原子写入，重启后数据不丢失。
+- **数据持久化**：数据存储于本地 SQLite 数据库文件（`DATA_DIR/app.db`），开启 WAL 与外键约束，重启后数据不丢失。
 
 ## 技术栈
 
-- 前端：React 18 + TypeScript + Vite + TailwindCSS + zustand + React Router
+- 前端：Vue 3（`<script setup>` + Composition API）+ TypeScript + Vite + TailwindCSS + Pinia + Vue Router
 - 后端：Express 4 + TypeScript（tsx 运行）
-- 存储：本地 JSON 文件（支持 `DATA_DIR` 环境变量指向持久化卷）
+- 存储：SQLite（better-sqlite3，支持 `DATA_DIR` 环境变量指向持久化卷）
+
+> 详细设计见 `docs/` 目录：技术文档、数据库设计说明、测试报告。
 
 ## 本地开发
 
@@ -56,13 +58,15 @@ docker run -d -p 80:3001 -v gms-data:/app/data gms
 ## 目录结构
 
 ```
-api/          后端（Express）
+api/          后端（Express + SQLite）
   routes/     认证、学生、成绩路由
   auth.ts     鉴权与密码哈希
-  store.ts    JSON 文件持久化
-src/          前端（React）
-  pages/      登录、学生管理、成绩管理页面
+  store.ts    SQLite 数据访问层（better-sqlite3）
+src/          前端（Vue 3）
+  pages/      登录、学生管理、成绩管理页面（.vue）
   components/ 通用组件（导航、弹窗、表单）
-  store/      zustand 状态管理
+  stores/     Pinia 状态管理（auth）
+  router/     Vue Router 路由与守卫
+docs/         技术文档、数据库设计说明、测试报告
 Dockerfile    生产镜像
 ```

@@ -47,14 +47,12 @@ router.post('/', requireAdmin, (req: AuthedRequest, res: Response): void => {
     res.status(400).json({ success: false, error: result.error })
     return
   }
-  const students = store.getStudents()
-  if (students.some((s) => s.studentNo === result.value!.studentNo)) {
+  if (store.getStudentByNo(result.value.studentNo)) {
     res.status(409).json({ success: false, error: '学号已存在' })
     return
   }
   const student: Student = { id: crypto.randomUUID(), ...result.value }
-  students.push(student)
-  store.saveStudents(students)
+  store.createStudent(student)
   res.status(201).json({ success: true, data: student })
 })
 
@@ -65,35 +63,28 @@ router.put('/:id', requireAdmin, (req: AuthedRequest, res: Response): void => {
     res.status(400).json({ success: false, error: result.error })
     return
   }
-  const students = store.getStudents()
-  const idx = students.findIndex((s) => s.id === req.params.id)
-  if (idx === -1) {
+  const existing = store.getStudentById(req.params.id)
+  if (!existing) {
     res.status(404).json({ success: false, error: '学生不存在' })
     return
   }
-  if (students.some((s) => s.studentNo === result.value!.studentNo && s.id !== req.params.id)) {
+  const conflict = store.getStudentByNo(result.value.studentNo)
+  if (conflict && conflict.id !== req.params.id) {
     res.status(409).json({ success: false, error: '学号已存在' })
     return
   }
-  students[idx] = { ...students[idx], ...result.value }
-  store.saveStudents(students)
-  res.json({ success: true, data: students[idx] })
+  store.updateStudent(req.params.id, result.value)
+  res.json({ success: true, data: { id: req.params.id, ...result.value } })
 })
 
 /** DELETE /api/students/:id - 删除学生并级联删除成绩（管理员） */
 router.delete('/:id', requireAdmin, (req: AuthedRequest, res: Response): void => {
-  const students = store.getStudents()
-  const idx = students.findIndex((s) => s.id === req.params.id)
-  if (idx === -1) {
+  const existing = store.getStudentById(req.params.id)
+  if (!existing) {
     res.status(404).json({ success: false, error: '学生不存在' })
     return
   }
-  students.splice(idx, 1)
-  store.saveStudents(students)
-
-  const grades = store.getGrades().filter((g) => g.studentId !== req.params.id)
-  store.saveGrades(grades)
-
+  store.deleteStudent(req.params.id)
   res.json({ success: true })
 })
 

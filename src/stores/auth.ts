@@ -1,68 +1,64 @@
 /**
- * 认证状态管理（zustand）。
+ * 认证状态管理（Pinia）。
  * 负责登录、注册、登出、恢复会话，并保存当前用户信息。
  */
-import { create } from 'zustand'
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { apiRequest, setToken, clearToken, getToken } from '@/utils/api'
 import type { AuthUser, Role } from '@/types'
-
-interface AuthState {
-  user: AuthUser | null
-  initializing: boolean
-  login: (username: string, password: string) => Promise<void>
-  register: (username: string, password: string, role: Role) => Promise<void>
-  logout: () => Promise<void>
-  restore: () => Promise<void>
-}
 
 interface AuthResponse {
   token: string
   user: AuthUser
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  initializing: true,
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<AuthUser | null>(null)
+  const initializing = ref(true)
 
-  login: async (username, password) => {
+  async function login(username: string, password: string) {
     const res = await apiRequest<AuthResponse>('/auth/login', {
       method: 'POST',
       body: { username, password },
     })
     setToken(res.token)
-    set({ user: res.user })
-  },
+    user.value = res.user
+  }
 
-  register: async (username, password, role) => {
+  async function register(username: string, password: string, role: Role) {
     const res = await apiRequest<AuthResponse>('/auth/register', {
       method: 'POST',
       body: { username, password, role },
     })
     setToken(res.token)
-    set({ user: res.user })
-  },
+    user.value = res.user
+  }
 
-  logout: async () => {
+  async function logout() {
     try {
       await apiRequest('/auth/logout', { method: 'POST' })
     } catch {
       // 即使请求失败也清除本地会话
     }
     clearToken()
-    set({ user: null })
-  },
+    user.value = null
+  }
 
-  restore: async () => {
+  async function restore() {
     if (!getToken()) {
-      set({ initializing: false })
+      initializing.value = false
       return
     }
     try {
       const res = await apiRequest<{ user: AuthUser }>('/auth/me')
-      set({ user: res.user, initializing: false })
+      user.value = res.user
     } catch {
       clearToken()
-      set({ user: null, initializing: false })
+      user.value = null
+    } finally {
+      initializing.value = false
     }
-  },
-}))
+  }
+
+  return { user, initializing, login, register, logout, restore }
+})
