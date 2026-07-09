@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import studentRoutes from './routes/students.js'
 import gradeRoutes from './routes/grades.js'
+import seedRoutes from './routes/seed.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -34,6 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/students', studentRoutes)
 app.use('/api/grades', gradeRoutes)
+app.use('/api/seed', seedRoutes)
 
 /**
  * health

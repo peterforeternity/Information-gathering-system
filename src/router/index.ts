@@ -4,6 +4,7 @@ import Login from '@/pages/Login.vue'
 import Students from '@/pages/Students.vue'
 import Grades from '@/pages/Grades.vue'
 import Analytics from '@/pages/Analytics.vue'
+import SeedDemo from '@/pages/SeedDemo.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -12,6 +13,7 @@ const router = createRouter({
     { path: '/students', name: 'students', component: Students, meta: { requiresAuth: true, adminOnly: true } },
     { path: '/grades', name: 'grades', component: Grades, meta: { requiresAuth: true } },
     { path: '/analytics', name: 'analytics', component: Analytics, meta: { requiresAuth: true } },
+    { path: '/seed', name: 'seed', component: SeedDemo, meta: { requiresAuth: true, adminOnly: true } },
     { path: '/:pathMatch(.*)*', redirect: '/grades' },
   ],
 })
