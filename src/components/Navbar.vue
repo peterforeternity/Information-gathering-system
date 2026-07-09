@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GraduationCap, Users, ClipboardList, LogOut } from 'lucide-vue-next'
+import { GraduationCap, Users, ClipboardList, BarChart3, LogOut } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -35,6 +35,13 @@ async function handleLogout() {
           active-class="!bg-amber !text-navy-dark"
         >
           <ClipboardList :size="16" /> 成绩管理
+        </router-link>
+        <router-link
+          to="/analytics"
+          class="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-cream/80 transition hover:bg-white/10 hover:text-cream"
+          active-class="!bg-amber !text-navy-dark"
+        >
+          <BarChart3 :size="16" /> 数据可视化
         </router-link>
       </nav>
 
