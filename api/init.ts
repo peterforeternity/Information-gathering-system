@@ -30,52 +30,68 @@ function randomScore(min = 30, max = 100): number {
 
 /** 仅在新数据库（无 admin 用户）时执行初始化。已存在的库不做任何修改。 */
 export function ensureInitialized(): void {
-  if (store.getUserByUsername(ADMIN_USERNAME)) {
-    return // 已初始化，跳过
+  console.log('[init] 开始检查数据库状态...')
+
+  try {
+    const existingAdmin = store.getUserByUsername(ADMIN_USERNAME)
+    console.log(`[init] admin 用户存在: ${!!existingAdmin}`)
+
+    if (existingAdmin) {
+      console.log('[init] 数据库已初始化，跳过。')
+      return
+    }
+  } catch (err) {
+    console.error('[init] 查询 admin 用户失败:', err)
+    return // 不阻塞启动，容错
   }
 
-  console.log('[init] 检测到新数据库，正在创建默认数据...')
+  console.log('[init] 检测到空数据库，正在创建默认数据...')
 
-  // 1. 创建 admin 账号
-  const { hash, salt } = hashPassword(ADMIN_PASSWORD)
-  store.createUser({
-    id: crypto.randomUUID(),
-    username: ADMIN_USERNAME,
-    passwordHash: hash,
-    salt,
-    role: 'admin',
-  })
-
-  // 2. 创建 demo 学生 + 登录账号 + 成绩
-  for (const s of DEMO_STUDENTS) {
-    // 学生档案
-    const studentId = crypto.randomUUID()
-    store.createStudent({
-      id: studentId,
-      studentNo: s.studentNo,
-      name: s.name,
-      gender: s.gender,
-      className: s.className,
-    })
-
-    // 登录账号（用户名=学号，统一密码）
-    const { hash: h, salt: sl } = hashPassword(DEMO_PASSWORD)
+  try {
+    // 1. 创建 admin 账号
+    const { hash, salt } = hashPassword(ADMIN_PASSWORD)
     store.createUser({
       id: crypto.randomUUID(),
-      username: s.studentNo,
-      passwordHash: h,
-      salt: sl,
-      role: 'student',
+      username: ADMIN_USERNAME,
+      passwordHash: hash,
+      salt,
+      role: 'admin',
     })
+    console.log('[init] admin 账号已创建')
 
-    // 为每个学生随机生成各科成绩
-    for (const subject of SUBJECTS) {
-      store.upsertGrade(studentId, subject, randomScore(40, 98))
+    // 2. 创建 demo 学生 + 登录账号 + 成绩
+    for (const s of DEMO_STUDENTS) {
+      // 学生档案
+      const studentId = crypto.randomUUID()
+      store.createStudent({
+        id: studentId,
+        studentNo: s.studentNo,
+        name: s.name,
+        gender: s.gender,
+        className: s.className,
+      })
+
+      // 登录账号（用户名=学号，统一密码）
+      const { hash: h, salt: sl } = hashPassword(DEMO_PASSWORD)
+      store.createUser({
+        id: crypto.randomUUID(),
+        username: s.studentNo,
+        passwordHash: h,
+        salt: sl,
+        role: 'student',
+      })
+
+      // 为每个学生随机生成各科成绩
+      for (const subject of SUBJECTS) {
+        store.upsertGrade(studentId, subject, randomScore(40, 98))
+      }
     }
-  }
 
-  const studentCount = DEMO_STUDENTS.length
-  const gradeCount = studentCount * SUBJECTS.length
-  console.log(`[init] 初始化完成：admin ×1，学生 ×${studentCount}，科目 ×${SUBJECTS.length}，成绩 ×${gradeCount}`)
-  console.log(`[init] 学生登录：学号 + 密码 ${DEMO_PASSWORD}，管理员：admin / ${ADMIN_PASSWORD}`)
+    const studentCount = DEMO_STUDENTS.length
+    const gradeCount = studentCount * SUBJECTS.length
+    console.log(`[init] 初始化完成：admin ×1，学生 ×${studentCount}，科目 ×${SUBJECTS.length}，成绩 ×${gradeCount}`)
+    console.log(`[init] 学生登录：学号 + 密码 ${DEMO_PASSWORD}，管理员：admin / ${ADMIN_PASSWORD}`)
+  } catch (err) {
+    console.error('[init] 初始化过程出错:', err)
+  }
 }
