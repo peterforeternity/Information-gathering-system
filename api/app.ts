@@ -41,22 +41,10 @@ app.use('/api/seed', seedRoutes)
 app.use('/api/student', studentDashboardRoutes)
 
 /**
- * health
- */
-app.use(
-  '/api/health',
-  (req: Request, res: Response, next: NextFunction): void => {
-    res.status(200).json({
-      success: true,
-      message: 'ok',
-    })
-  },
-)
-
-/**
  * 诊断端点：返回数据库状态，用于排查 Railway 等远程环境的初始化问题。
+ * 注意：必须放在 /api/health 之前，且用独立路径，避免被 health 前缀中间件拦截。
  */
-app.get('/api/health/diag', (req: Request, res: Response): void => {
+app.get('/api/diag', (req: Request, res: Response): void => {
   const users = store.getUserByUsername('admin')
   const students = store.getStudents()
   res.json({
@@ -68,6 +56,19 @@ app.get('/api/health/diag', (req: Request, res: Response): void => {
     studentSample: students.slice(0, 3).map(s => ({ no: s.studentNo, name: s.name, cls: s.className })),
   })
 })
+
+/**
+ * health
+ */
+app.use(
+  '/api/health',
+  (req: Request, res: Response, next: NextFunction): void => {
+    res.status(200).json({
+      success: true,
+      message: 'ok',
+    })
+  },
+)
 
 /**
  * 生产环境：托管前端构建产物（dist），并对非 /api 的路由回退到 index.html（支持前端路由）。
