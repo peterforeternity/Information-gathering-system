@@ -11,7 +11,9 @@
     "check": "vue-tsc --noEmit",
     "server:dev": "nodemon",
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
-    "start": "NODE_ENV=production tsx api/server.ts"
+    "start": "NODE_ENV=production tsx api/server.ts",
+    "railway:build": "npm run build",
+    "railway:start": "NODE_ENV=production tsx api/server.ts"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
@@ -25,6 +27,7 @@
     "lucide-vue-next": "^0.511.0",
     "pinia": "^2.3.1",
     "tailwind-merge": "^3.0.2",
+    "tsx": "^4.20.3",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0",
     "xlsx": "^0.18.5"
@@ -45,7 +48,6 @@
     "nodemon": "^3.1.10",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.20.3",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
