@@ -12,6 +12,7 @@ interface GenResult { students: GenStudent[]; grades: GenGrade[]; summary: GenSu
 
 interface PushResult {
   students: { inserted: number; skipped: number }
+  accounts: { inserted: number; skipped: number; defaultPassword: string }
   grades: { inserted: number; skipped: number }
   errors: string[]
 }
@@ -190,7 +191,12 @@ async function handleGenerateAndPush() {
             <template #description>
               <ul class="space-y-1 text-sm">
                 <li>学生：新增 {{ pushResult.students.inserted }}，跳过 {{ pushResult.students.skipped }}</li>
+                <li>登录账号：新增 {{ pushResult.accounts.inserted }}，跳过 {{ pushResult.accounts.skipped }}</li>
                 <li>成绩：新增 {{ pushResult.grades.inserted }}，跳过 {{ pushResult.grades.skipped }}</li>
+                <li class="mt-1 rounded bg-navy/5 px-2 py-1 text-xs text-navy">
+                  学生登录：用户名 = 学号，默认密码
+                  <b class="text-amber-dark">{{ pushResult.accounts.defaultPassword }}</b>
+                </li>
                 <li v-for="(e, i) in pushResult.errors" :key="i" class="text-red-600 text-xs">⚠ {{ e }}</li>
               </ul>
             </template>

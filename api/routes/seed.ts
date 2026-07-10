@@ -5,11 +5,14 @@
  */
 import { Router, type Response } from 'express'
 import { store } from '../store.js'
-import { requireAuth, requireAdmin, type AuthedRequest } from '../auth.js'
+import { requireAuth, requireAdmin, hashPassword, type AuthedRequest } from '../auth.js'
 import crypto from 'crypto'
 
 const router = Router()
 router.use(requireAuth, requireAdmin)
+
+/** 推送 demo 学生时统一使用的默认登录密码。 */
+const DEMO_PASSWORD = 'demo123456'
 
 // ── 中文姓名素材 ──
 const SURNAMES = ['张', '李', '王', '赵', '孙', '周', '吴', '郑', '陈', '刘', '杨', '黄', '林', '何', '罗']
@@ -102,6 +105,8 @@ router.post('/push', (req: AuthedRequest, res: Response): void => {
   const errors: string[] = []
   let studentInserted = 0
   let studentSkipped = 0
+  let accountInserted = 0
+  let accountSkipped = 0
 
   // 先插入学生
   for (const s of students) {
@@ -115,16 +120,32 @@ router.post('/push', (req: AuthedRequest, res: Response): void => {
       const existing = store.getStudentByNo(studentNo)
       if (existing) {
         studentSkipped++
-        continue
+      } else {
+        store.createStudent({
+          id: crypto.randomUUID(),
+          studentNo,
+          name,
+          gender,
+          className,
+        })
+        studentInserted++
       }
-      store.createStudent({
-        id: crypto.randomUUID(),
-        studentNo,
-        name,
-        gender,
-        className,
-      })
-      studentInserted++
+
+      // 同步创建登录账号：用户名=学号，默认密码 demo123456，角色 student。
+      // 已存在同名账号则跳过（幂等）。
+      if (store.getUserByUsername(studentNo)) {
+        accountSkipped++
+      } else {
+        const { hash, salt } = hashPassword(DEMO_PASSWORD)
+        store.createUser({
+          id: crypto.randomUUID(),
+          username: studentNo,
+          passwordHash: hash,
+          salt,
+          role: 'student',
+        })
+        accountInserted++
+      }
     } catch (err: any) {
       errors.push(`学生 ${name}(${studentNo}) 写入失败: ${err.message}`)
     }
@@ -161,6 +182,7 @@ router.post('/push', (req: AuthedRequest, res: Response): void => {
     success: errors.length === 0,
     data: {
       students: { inserted: studentInserted, skipped: studentSkipped },
+      accounts: { inserted: accountInserted, skipped: accountSkipped, defaultPassword: DEMO_PASSWORD },
       grades: { inserted: gradeInserted, skipped: gradeSkipped },
       errors,
     },
