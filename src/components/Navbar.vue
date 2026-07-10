@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GraduationCap, Users, ClipboardList, BarChart3, Sparkles, LogOut } from 'lucide-vue-next'
+import { GraduationCap, Users, ClipboardList, BarChart3, Sparkles, LogOut, LayoutDashboard } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -21,6 +21,14 @@ async function handleLogout() {
       </div>
 
       <nav class="flex items-center gap-1">
+        <router-link
+          v-if="auth.user?.role === 'student'"
+          to="/dashboard"
+          class="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-cream/80 transition hover:bg-white/10 hover:text-cream"
+          active-class="!bg-amber !text-navy-dark"
+        >
+          <LayoutDashboard :size="16" /> 我的看板
+        </router-link>
         <router-link
           v-if="auth.user?.role === 'admin'"
           to="/students"

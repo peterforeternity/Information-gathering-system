@@ -15,6 +15,7 @@ import authRoutes from './routes/auth.js'
 import studentRoutes from './routes/students.js'
 import gradeRoutes from './routes/grades.js'
 import seedRoutes from './routes/seed.js'
+import studentDashboardRoutes from './routes/student.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -36,6 +37,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/students', studentRoutes)
 app.use('/api/grades', gradeRoutes)
 app.use('/api/seed', seedRoutes)
+app.use('/api/student', studentDashboardRoutes)
 
 /**
  * health

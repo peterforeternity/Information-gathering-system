@@ -5,11 +5,13 @@ import Students from '@/pages/Students.vue'
 import Grades from '@/pages/Grades.vue'
 import Analytics from '@/pages/Analytics.vue'
 import SeedDemo from '@/pages/SeedDemo.vue'
+import StudentDashboard from '@/pages/StudentDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
+    { path: '/dashboard', name: 'dashboard', component: StudentDashboard, meta: { requiresAuth: true, studentOnly: true } },
     { path: '/students', name: 'students', component: Students, meta: { requiresAuth: true, adminOnly: true } },
     { path: '/grades', name: 'grades', component: Grades, meta: { requiresAuth: true } },
     { path: '/analytics', name: 'analytics', component: Analytics, meta: { requiresAuth: true } },
@@ -18,17 +20,20 @@ const router = createRouter({
   ],
 })
 
-// 全局路由守卫：登录校验与管理员权限控制。
+// 全局路由守卫：登录校验与角色权限控制。
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.user) {
     return { path: '/login' }
   }
   if (to.meta.adminOnly && auth.user?.role !== 'admin') {
+    return { path: auth.user?.role === 'student' ? '/dashboard' : '/grades' }
+  }
+  if (to.meta.studentOnly && auth.user?.role !== 'student') {
     return { path: '/grades' }
   }
   if (to.meta.guestOnly && auth.user) {
-    return { path: '/grades' }
+    return { path: auth.user.role === 'student' ? '/dashboard' : '/students' }
   }
   return true
 })

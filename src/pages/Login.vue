@@ -53,7 +53,7 @@ async function handleSubmit() {
     } else {
       await auth.register(form.username.trim(), form.password, form.role)
     }
-    router.replace(auth.user?.role === 'admin' ? '/students' : '/grades')
+    router.replace(auth.user?.role === 'admin' ? '/students' : '/dashboard')
   } catch (err) {
     error.value = err instanceof ApiError ? err.message : '操作失败，请重试'
   } finally {

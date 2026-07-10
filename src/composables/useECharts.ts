@@ -15,12 +15,13 @@ import {
 } from 'vue'
 import * as echarts from 'echarts/core'
 import type { EChartsCoreOption } from 'echarts/core'
-import { PieChart, BarChart, LineChart } from 'echarts/charts'
+import { PieChart, BarChart, LineChart, RadarChart } from 'echarts/charts'
 import {
   TitleComponent,
   TooltipComponent,
   LegendComponent,
   GridComponent,
+  RadarComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -29,10 +30,12 @@ echarts.use([
   PieChart,
   BarChart,
   LineChart,
+  RadarChart,
   TitleComponent,
   TooltipComponent,
   LegendComponent,
   GridComponent,
+  RadarComponent,
   CanvasRenderer,
 ])
 
