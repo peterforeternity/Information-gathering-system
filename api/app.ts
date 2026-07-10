@@ -47,12 +47,21 @@ app.use('/api/student', studentDashboardRoutes)
 app.get('/api/diag', (req: Request, res: Response): void => {
   const users = store.getUserByUsername('admin')
   const students = store.getStudents()
+  // 检查前几个 demo 学生是否有对应的登录账号（users 表）
+  const accountChecks = students.slice(0, 5).map(s => ({
+    studentNo: s.studentNo,
+    hasAccount: !!store.getUserByUsername(s.studentNo),
+  }))
+  const withAccount = students.filter(s => store.getUserByUsername(s.studentNo)).length
   res.json({
     success: true,
     nodeEnv: process.env.NODE_ENV ?? 'not set',
     hasAdmin: !!users,
     adminExists: users ? { username: users.username, role: users.role } : null,
     studentCount: students.length,
+    studentsWithAccount: withAccount,
+    studentsWithoutAccount: students.length - withAccount,
+    accountChecks,
     studentSample: students.slice(0, 3).map(s => ({ no: s.studentNo, name: s.name, cls: s.className })),
   })
 })

@@ -28,6 +28,34 @@ function randomScore(min = 30, max = 100): number {
   return Math.round(Math.random() * (max - min) + min)
 }
 
+/** 为缺少登录账号的学生补建账号（用户名=学号，密码 demo123456）。幂等，可重复执行。 */
+function backfillStudentAccounts(): void {
+  try {
+    const students = store.getStudents()
+    let created = 0
+    for (const s of students) {
+      if (!store.getUserByUsername(s.studentNo)) {
+        const { hash, salt } = hashPassword(DEMO_PASSWORD)
+        store.createUser({
+          id: crypto.randomUUID(),
+          username: s.studentNo,
+          passwordHash: hash,
+          salt,
+          role: 'student',
+        })
+        created++
+      }
+    }
+    if (created > 0) {
+      console.log(`[init] 补建学生登录账号 ×${created}（密码 ${DEMO_PASSWORD}）`)
+    } else {
+      console.log('[init] 所有学生均已有登录账号，无需补建')
+    }
+  } catch (err) {
+    console.error('[init] 补建学生账号出错:', err)
+  }
+}
+
 /** 仅在新数据库（无 admin 用户）时执行初始化。已存在的库不做任何修改。 */
 export function ensureInitialized(): void {
   console.log('[init] 开始检查数据库状态...')
@@ -37,7 +65,8 @@ export function ensureInitialized(): void {
     console.log(`[init] admin 用户存在: ${!!existingAdmin}`)
 
     if (existingAdmin) {
-      console.log('[init] 数据库已初始化，跳过。')
+      console.log('[init] 数据库已初始化，检查学生账号完整性...')
+      backfillStudentAccounts() // 关键：修复历史数据中缺失的学生账号
       return
     }
   } catch (err) {
