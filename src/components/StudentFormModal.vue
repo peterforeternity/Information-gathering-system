@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import Modal from '@/components/Modal.vue'
+import { message } from 'ant-design-vue'
 import type { Student } from '@/types'
 
 export interface StudentInput {
@@ -21,7 +21,6 @@ const emit = defineEmits<{ close: [] }>()
 const empty = (): StudentInput => ({ studentNo: '', name: '', gender: '男', className: '' })
 
 const form = ref<StudentInput>(empty())
-const error = ref('')
 const loading = ref(false)
 
 watch(
@@ -36,18 +35,16 @@ watch(
             className: props.editing.className,
           }
         : empty()
-      error.value = ''
     }
   },
 )
 
-async function handleSubmit() {
+async function handleOk() {
   if (!form.value.studentNo.trim() || !form.value.name.trim() || !form.value.className.trim()) {
-    error.value = '请填写所有字段'
+    message.warning('请填写所有字段')
     return
   }
   loading.value = true
-  error.value = ''
   try {
     await props.onSubmit({
       studentNo: form.value.studentNo.trim(),
@@ -57,7 +54,7 @@ async function handleSubmit() {
     })
     emit('close')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存失败'
+    message.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     loading.value = false
   }
@@ -65,38 +62,33 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <Modal :open="open" :title="editing ? '编辑学生' : '新增学生'" @close="$emit('close')">
-    <form class="space-y-4" @submit.prevent="handleSubmit">
-      <div>
-        <label class="label">学号</label>
-        <input v-model="form.studentNo" class="field" placeholder="如 2024001" />
-      </div>
-      <div>
-        <label class="label">姓名</label>
-        <input v-model="form.name" class="field" placeholder="请输入姓名" />
-      </div>
+  <a-modal
+    :open="open"
+    :title="editing ? '编辑学生' : '新增学生'"
+    :confirm-loading="loading"
+    ok-text="保存"
+    cancel-text="取消"
+    @ok="handleOk"
+    @cancel="$emit('close')"
+  >
+    <a-form layout="vertical" class="pt-2">
+      <a-form-item label="学号" required>
+        <a-input v-model:value="form.studentNo" placeholder="如 2024001" />
+      </a-form-item>
+      <a-form-item label="姓名" required>
+        <a-input v-model:value="form.name" placeholder="请输入姓名" />
+      </a-form-item>
       <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="label">性别</label>
-          <select v-model="form.gender" class="field">
-            <option value="男">男</option>
-            <option value="女">女</option>
-          </select>
-        </div>
-        <div>
-          <label class="label">班级</label>
-          <input v-model="form.className" class="field" placeholder="如 三年级二班" />
-        </div>
+        <a-form-item label="性别">
+          <a-select v-model:value="form.gender">
+            <a-select-option value="男">男</a-select-option>
+            <a-select-option value="女">女</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="班级" required>
+          <a-input v-model:value="form.className" placeholder="如 三年级二班" />
+        </a-form-item>
       </div>
-
-      <p v-if="error" class="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{{ error }}</p>
-
-      <div class="flex justify-end gap-3 pt-2">
-        <button type="button" class="btn-ghost" @click="$emit('close')">取消</button>
-        <button type="submit" class="btn-primary" :disabled="loading">
-          {{ loading ? '保存中...' : '保存' }}
-        </button>
-      </div>
-    </form>
-  </Modal>
+    </a-form>
+  </a-modal>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Sparkles, Upload, Eye, Table, CheckCircle, AlertCircle, Users, Hash } from 'lucide-vue-next'
+import { Sparkles, Upload, Eye, Table as TableIcon } from 'lucide-vue-next'
+import { message } from 'ant-design-vue'
 import Navbar from '@/components/Navbar.vue'
 import { apiRequest } from '@/utils/api'
 
@@ -25,11 +26,9 @@ const scoreMax = ref(100)
 
 const generated = ref<GenResult | null>(null)
 const generating = ref(false)
-const genError = ref('')
 
 const pushing = ref(false)
 const pushResult = ref<PushResult | null>(null)
-const pushError = ref('')
 
 /** 学生→成绩映射（按 studentNo 索引） */
 const studentGrades = computed(() => {
@@ -42,11 +41,26 @@ const studentGrades = computed(() => {
   return map
 })
 
+/** 预览表格列 */
+const previewColumns = computed(() => {
+  if (!generated.value) return []
+  const base = [
+    { title: '学号', dataIndex: 'studentNo', key: 'studentNo' },
+    { title: '姓名', dataIndex: 'name', key: 'name' },
+    { title: '性别', dataIndex: 'gender', key: 'gender', width: 70 },
+    { title: '班级', dataIndex: 'className', key: 'className' },
+  ]
+  const subjectCols = generated.value.summary.subjects.map((s) => ({
+    title: s,
+    key: s,
+    align: 'center' as const,
+  }))
+  return [...base, ...subjectCols]
+})
+
 /** ── 生成预览 ── */
 async function handleGenerate() {
-  genError.value = ''
   pushResult.value = null
-  pushError.value = ''
   generating.value = true
 
   const classes = classInput.value.split(',').map((s) => s.trim()).filter(Boolean)
@@ -64,8 +78,9 @@ async function handleGenerate() {
       },
     })
     generated.value = res.data
+    message.success(`已生成 ${res.data.summary.studentCount} 名学生的预览数据`)
   } catch (err) {
-    genError.value = err instanceof Error ? err.message : '生成失败'
+    message.error(err instanceof Error ? err.message : '生成失败')
     generated.value = null
   } finally {
     generating.value = false
@@ -75,7 +90,6 @@ async function handleGenerate() {
 /** ── 推送到数据库 ── */
 async function handlePush() {
   if (!generated.value) return
-  pushError.value = ''
   pushing.value = true
 
   try {
@@ -87,8 +101,13 @@ async function handlePush() {
       },
     })
     pushResult.value = res.data
+    if (res.data.errors.length === 0) {
+      message.success('测试数据已全部推送入库')
+    } else {
+      message.warning(`推送完成，但有 ${res.data.errors.length} 条错误`)
+    }
   } catch (err) {
-    pushError.value = err instanceof Error ? err.message : '推送失败'
+    message.error(err instanceof Error ? err.message : '推送失败')
     pushResult.value = null
   } finally {
     pushing.value = false
@@ -118,158 +137,116 @@ async function handleGenerateAndPush() {
       <div class="grid gap-6 lg:grid-cols-5">
         <!-- 左：配置面板 -->
         <div class="lg:col-span-2">
-          <div class="rounded-lg border border-navy/10 bg-white p-5 shadow-card">
-            <h3 class="mb-4 flex items-center gap-2 font-display text-base font-semibold text-navy">
-              <Sparkles :size="18" class="text-amber" /> 生成参数
-            </h3>
+          <a-card>
+            <template #title>
+              <span class="flex items-center gap-2">
+                <Sparkles :size="18" class="text-amber" /> 生成参数
+              </span>
+            </template>
 
-            <div class="space-y-4">
-              <div>
-                <label class="label">学生数量</label>
-                <div class="flex items-center gap-2">
-                  <input v-model.number="studentCount" class="field" type="number" min="1" max="50" />
-                  <span class="text-xs text-navy/50">1–50</span>
-                </div>
-              </div>
-
-              <div>
-                <label class="label">年级前缀</label>
-                <input v-model="classPrefix" class="field" placeholder="如：三年级、2024级" />
-              </div>
-
-              <div>
-                <label class="label">班级（逗号分隔）</label>
-                <input v-model="classInput" class="field" placeholder="一班,二班,三班" />
-              </div>
-
-              <div>
-                <label class="label">科目（逗号分隔）</label>
-                <input v-model="subjectInput" class="field" placeholder="语文,数学,英语,科学" />
-              </div>
-
+            <a-form layout="vertical">
+              <a-form-item label="学生数量">
+                <a-input-number v-model:value="studentCount" :min="1" :max="50" class="w-full" />
+              </a-form-item>
+              <a-form-item label="年级前缀">
+                <a-input v-model:value="classPrefix" placeholder="如：三年级、2024级" />
+              </a-form-item>
+              <a-form-item label="班级（逗号分隔）">
+                <a-input v-model:value="classInput" placeholder="一班,二班,三班" />
+              </a-form-item>
+              <a-form-item label="科目（逗号分隔）">
+                <a-input v-model:value="subjectInput" placeholder="语文,数学,英语,科学" />
+              </a-form-item>
               <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="label">最低分</label>
-                  <input v-model.number="scoreMin" class="field" type="number" min="0" max="99" />
-                </div>
-                <div>
-                  <label class="label">最高分</label>
-                  <input v-model.number="scoreMax" class="field" type="number" min="1" max="100" />
-                </div>
+                <a-form-item label="最低分">
+                  <a-input-number v-model:value="scoreMin" :min="0" :max="99" class="w-full" />
+                </a-form-item>
+                <a-form-item label="最高分">
+                  <a-input-number v-model:value="scoreMax" :min="1" :max="100" class="w-full" />
+                </a-form-item>
               </div>
 
-              <p v-if="genError" class="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{{ genError }}</p>
-
-              <button class="btn-primary w-full" :disabled="generating" @click="handleGenerate">
-                <Eye :size="16" /> {{ generating ? '生成中...' : '生成预览' }}
-              </button>
-
-              <button
-                v-if="generated"
-                class="btn-accent w-full"
-                :disabled="pushing"
-                @click="handleGenerateAndPush"
-              >
-                <Upload :size="16" /> {{ pushing ? '推送中...' : '一键生成并推送' }}
-              </button>
-            </div>
-          </div>
+              <a-space direction="vertical" class="w-full">
+                <a-button type="primary" block :loading="generating" @click="handleGenerate">
+                  <template #icon><Eye :size="16" class="inline" /></template>
+                  生成预览
+                </a-button>
+                <a-button v-if="generated" block :loading="pushing" @click="handleGenerateAndPush">
+                  <template #icon><Upload :size="16" class="inline" /></template>
+                  一键生成并推送
+                </a-button>
+              </a-space>
+            </a-form>
+          </a-card>
 
           <!-- 推送结果反馈 -->
-          <div v-if="pushResult" class="mt-4 rounded-lg border p-4 shadow-card"
-               :class="pushResult.errors.length > 0 ? 'border-amber/50 bg-amber/5' : 'border-green-300 bg-green-50'">
-            <div class="mb-2 flex items-center gap-2">
-              <CheckCircle v-if="pushResult.errors.length === 0" :size="18" class="text-green-600" />
-              <AlertCircle v-else :size="18" class="text-amber" />
-              <span class="text-sm font-semibold text-navy">推送结果</span>
-            </div>
-            <ul class="space-y-1 text-sm text-navy/80">
-              <li class="flex items-center gap-2">
-                <Users :size="14" /> 学生：新增 {{ pushResult.students.inserted }}，跳过 {{ pushResult.students.skipped }}
-              </li>
-              <li class="flex items-center gap-2">
-                <Hash :size="14" /> 成绩：新增 {{ pushResult.grades.inserted }}，跳过 {{ pushResult.grades.skipped }}
-              </li>
-              <li v-for="(e, i) in pushResult.errors" :key="i" class="text-red-600 text-xs">⚠ {{ e }}</li>
-            </ul>
-          </div>
-          <p v-if="pushError" class="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-600">{{ pushError }}</p>
+          <a-alert
+            v-if="pushResult"
+            class="mt-4"
+            :type="pushResult.errors.length > 0 ? 'warning' : 'success'"
+            show-icon
+          >
+            <template #message>推送结果</template>
+            <template #description>
+              <ul class="space-y-1 text-sm">
+                <li>学生：新增 {{ pushResult.students.inserted }}，跳过 {{ pushResult.students.skipped }}</li>
+                <li>成绩：新增 {{ pushResult.grades.inserted }}，跳过 {{ pushResult.grades.skipped }}</li>
+                <li v-for="(e, i) in pushResult.errors" :key="i" class="text-red-600 text-xs">⚠ {{ e }}</li>
+              </ul>
+            </template>
+          </a-alert>
         </div>
 
         <!-- 右：预览区域 -->
         <div class="lg:col-span-3">
-          <div
+          <a-empty
             v-if="!generated && !generating"
-            class="flex h-64 items-center justify-center rounded-lg border border-dashed border-navy/20 bg-white/50 text-navy/40"
+            class="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed border-navy/20 bg-white/50"
           >
-            <div class="text-center">
-              <Table class="mx-auto mb-2" :size="28" />
-              <p class="text-sm">配置参数后点击「生成预览」查看数据</p>
-            </div>
-          </div>
-
-          <div v-if="generating" class="flex h-64 items-center justify-center text-navy/50">
-            <Sparkles class="mr-2 animate-pulse" :size="20" /> 正在生成测试数据...
-          </div>
+            <template #image><TableIcon :size="40" class="mx-auto text-navy/30" /></template>
+            <template #description>配置参数后点击「生成预览」查看数据</template>
+          </a-empty>
 
           <template v-if="generated">
             <!-- 概览 -->
-            <div class="mb-4 grid grid-cols-4 gap-3">
-              <div class="rounded-lg border border-navy/10 bg-white px-3 py-2 shadow-card">
-                <p class="text-xs text-navy/60">学生</p>
-                <p class="text-lg font-bold text-navy">{{ generated.summary.studentCount }}</p>
-              </div>
-              <div class="rounded-lg border border-navy/10 bg-white px-3 py-2 shadow-card">
-                <p class="text-xs text-navy/60">成绩数</p>
-                <p class="text-lg font-bold text-navy">{{ generated.summary.gradeCount }}</p>
-              </div>
-              <div class="rounded-lg border border-navy/10 bg-white px-3 py-2 shadow-card">
-                <p class="text-xs text-navy/60">班级</p>
-                <p class="text-lg font-bold text-navy">{{ generated.summary.classes.length }}</p>
-              </div>
-              <div class="rounded-lg border border-navy/10 bg-white px-3 py-2 shadow-card">
-                <p class="text-xs text-navy/60">科目</p>
-                <p class="text-lg font-bold text-navy">{{ generated.summary.subjects.length }}</p>
-              </div>
-            </div>
+            <a-row :gutter="12" class="mb-4">
+              <a-col :span="6">
+                <a-card size="small"><a-statistic title="学生" :value="generated.summary.studentCount" /></a-card>
+              </a-col>
+              <a-col :span="6">
+                <a-card size="small"><a-statistic title="成绩数" :value="generated.summary.gradeCount" /></a-card>
+              </a-col>
+              <a-col :span="6">
+                <a-card size="small"><a-statistic title="班级" :value="generated.summary.classes.length" /></a-card>
+              </a-col>
+              <a-col :span="6">
+                <a-card size="small"><a-statistic title="科目" :value="generated.summary.subjects.length" /></a-card>
+              </a-col>
+            </a-row>
 
             <!-- 预览表格 -->
-            <div class="overflow-hidden rounded-lg border border-navy/10 bg-white shadow-card">
-              <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="bg-navy text-left text-cream">
-                      <th class="px-3 py-2 font-medium">学号</th>
-                      <th class="px-3 py-2 font-medium">姓名</th>
-                      <th class="px-3 py-2 font-medium">性别</th>
-                      <th class="px-3 py-2 font-medium">班级</th>
-                      <th v-for="s in generated.summary.subjects" :key="s" class="px-3 py-2 font-medium">{{ s }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(stu, i) in generated.students"
-                      :key="stu.studentNo"
-                      :class="i % 2 === 0 ? 'bg-white' : 'bg-cream/60'"
-                    >
-                      <td class="px-3 py-2 font-medium text-navy">{{ stu.studentNo }}</td>
-                      <td class="px-3 py-2">{{ stu.name }}</td>
-                      <td class="px-3 py-2">{{ stu.gender }}</td>
-                      <td class="px-3 py-2">{{ stu.className }}</td>
-                      <td v-for="s in generated.summary.subjects" :key="s" class="px-3 py-2 font-mono">
-                        {{ studentGrades[stu.studentNo]?.find((g) => g.subject === s)?.score ?? '—' }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <a-table
+              :columns="previewColumns"
+              :data-source="generated.students"
+              :loading="generating"
+              row-key="studentNo"
+              size="small"
+              :scroll="{ x: 'max-content' }"
+              :pagination="{ pageSize: 8, showTotal: (t: number) => `共 ${t} 条` }"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="generated!.summary.subjects.includes(column.key as string)">
+                  {{ studentGrades[(record as GenStudent).studentNo]?.find((g) => g.subject === column.key)?.score ?? '—' }}
+                </template>
+              </template>
+            </a-table>
 
             <!-- 底部推送按钮 -->
             <div class="mt-4 flex justify-end">
-              <button class="btn-primary" :disabled="pushing" @click="handlePush">
-                <Upload :size="16" /> {{ pushing ? '推送中...' : '推送到数据库' }}
-              </button>
+              <a-button type="primary" :loading="pushing" @click="handlePush">
+                <template #icon><Upload :size="16" class="inline" /></template>
+                推送到数据库
+              </a-button>
             </div>
           </template>
         </div>

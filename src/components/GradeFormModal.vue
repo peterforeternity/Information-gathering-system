@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import Modal from '@/components/Modal.vue'
+import { ref, computed, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import type { Student } from '@/types'
 
 export interface GradeInput {
@@ -18,11 +18,21 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>()
 
-const studentId = ref('')
+const studentId = ref<string>('')
 const subject = ref('')
-const score = ref('')
-const error = ref('')
+const score = ref<number | null>(null)
 const loading = ref(false)
+
+// 学生下拉选项
+const studentOptions = computed(() =>
+  props.students.map((s) => ({
+    value: s.id,
+    label: `${s.studentNo} - ${s.name}（${s.className}）`,
+  })),
+)
+
+// 科目自动补全选项
+const subjectOptions = computed(() => props.subjects.map((s) => ({ value: s })))
 
 watch(
   () => props.open,
@@ -30,34 +40,31 @@ watch(
     if (open) {
       studentId.value = props.students[0]?.id ?? ''
       subject.value = ''
-      score.value = ''
-      error.value = ''
+      score.value = null
     }
   },
 )
 
-async function handleSubmit() {
+async function handleOk() {
   const trimmedSubject = subject.value.trim()
-  const numScore = Number(score.value)
   if (!studentId.value) {
-    error.value = '请选择学生'
+    message.warning('请选择学生')
     return
   }
   if (!trimmedSubject) {
-    error.value = '请填写科目名称'
+    message.warning('请填写科目名称')
     return
   }
-  if (!Number.isFinite(numScore) || numScore < 0 || numScore > 100) {
-    error.value = '分数必须在 0-100 之间'
+  if (score.value === null || !Number.isFinite(score.value) || score.value < 0 || score.value > 100) {
+    message.warning('分数必须在 0-100 之间')
     return
   }
   loading.value = true
-  error.value = ''
   try {
-    await props.onSubmit({ studentId: studentId.value, subject: trimmedSubject, score: numScore })
+    await props.onSubmit({ studentId: studentId.value, subject: trimmedSubject, score: score.value })
     emit('close')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '保存失败'
+    message.error(err instanceof Error ? err.message : '保存失败')
   } finally {
     loading.value = false
   }
@@ -65,53 +72,48 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <Modal :open="open" title="录入成绩" @close="$emit('close')">
-    <form class="space-y-4" @submit.prevent="handleSubmit">
-      <div>
-        <label class="label">学生</label>
-        <select v-model="studentId" class="field">
-          <option v-if="students.length === 0" value="">暂无学生</option>
-          <option v-for="s in students" :key="s.id" :value="s.id">
-            {{ s.studentNo }} - {{ s.name }}（{{ s.className }}）
-          </option>
-        </select>
-      </div>
-      <div>
-        <label class="label">科目</label>
-        <input
-          v-model="subject"
-          class="field"
-          placeholder="如 语文 / 数学 / 英语"
-          list="subject-options"
+  <a-modal
+    :open="open"
+    title="录入成绩"
+    :confirm-loading="loading"
+    :ok-button-props="{ disabled: students.length === 0 }"
+    ok-text="保存"
+    cancel-text="取消"
+    @ok="handleOk"
+    @cancel="$emit('close')"
+  >
+    <a-form layout="vertical" class="pt-2">
+      <a-form-item label="学生" required>
+        <a-select
+          v-model:value="studentId"
+          :options="studentOptions"
+          placeholder="请选择学生"
+          show-search
+          option-filter-prop="label"
+          :not-found-content="students.length === 0 ? '暂无学生' : undefined"
         />
-        <datalist id="subject-options">
-          <option v-for="s in subjects" :key="s" :value="s" />
-        </datalist>
+      </a-form-item>
+      <a-form-item label="科目" required>
+        <a-auto-complete
+          v-model:value="subject"
+          :options="subjectOptions"
+          placeholder="如 语文 / 数学 / 英语"
+          :filter-option="(input: string, option: any) => option.value.toLowerCase().includes(input.toLowerCase())"
+        />
         <p class="mt-1 text-xs text-navy/50">
           可从已有科目中选择，或输入新科目。相同学生同一科目会覆盖更新。
         </p>
-      </div>
-      <div>
-        <label class="label">分数（0-100）</label>
-        <input
-          v-model="score"
-          class="field"
-          type="number"
-          min="0"
-          max="100"
-          step="0.5"
+      </a-form-item>
+      <a-form-item label="分数（0-100）" required>
+        <a-input-number
+          v-model:value="score"
+          :min="0"
+          :max="100"
+          :step="0.5"
           placeholder="请输入分数"
+          class="w-full"
         />
-      </div>
-
-      <p v-if="error" class="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{{ error }}</p>
-
-      <div class="flex justify-end gap-3 pt-2">
-        <button type="button" class="btn-ghost" @click="$emit('close')">取消</button>
-        <button type="submit" class="btn-primary" :disabled="loading || students.length === 0">
-          {{ loading ? '保存中...' : '保存' }}
-        </button>
-      </div>
-    </form>
-  </Modal>
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>

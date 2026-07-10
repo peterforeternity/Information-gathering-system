@@ -60,12 +60,15 @@ async function handleLogout() {
             {{ auth.user?.role === 'admin' ? '管理员' : '学生' }}
           </p>
         </div>
-        <button
-          class="inline-flex items-center gap-1.5 rounded border border-white/20 px-3 py-2 text-sm text-cream/90 transition hover:bg-white/10"
+        <a-button
+          ghost
+          size="small"
+          class="!border-white/20 !text-cream/90"
           @click="handleLogout"
         >
-          <LogOut :size="16" /> 登出
-        </button>
+          <template #icon><LogOut :size="15" class="inline" /></template>
+          登出
+        </a-button>
       </div>
     </div>
   </header>

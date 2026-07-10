@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Plus, ArrowUp, ArrowDown, ChevronsUpDown, ClipboardList, Download } from 'lucide-vue-next'
+import { Plus, Download } from 'lucide-vue-next'
+import { message } from 'ant-design-vue'
 import * as XLSX from 'xlsx'
 import Navbar from '@/components/Navbar.vue'
 import GradeFormModal, { type GradeInput } from '@/components/GradeFormModal.vue'
 import { apiRequest } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 import type { GradeRow, GradeTable, Student } from '@/types'
-
-type SortDir = 'asc' | 'desc'
-// 排序键：固定列名或某个科目名或 average
-type SortKey = 'studentNo' | 'name' | 'className' | 'average' | string
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.role === 'admin')
@@ -20,8 +17,52 @@ const students = ref<Student[]>([])
 const loading = ref(true)
 const error = ref('')
 const modalOpen = ref(false)
-const sortKey = ref<SortKey>('studentNo')
-const sortDir = ref<SortDir>('asc')
+const keyword = ref('')
+
+// 动态列：固定列 + 各科目列 + 平均分列，均启用 a-table 内置排序
+const columns = computed(() => {
+  const base: any[] = [
+    {
+      title: '学号',
+      dataIndex: 'studentNo',
+      key: 'studentNo',
+      fixed: 'left',
+      sorter: (a: GradeRow, b: GradeRow) => a.studentNo.localeCompare(b.studentNo, 'zh-CN'),
+    },
+    { title: '姓名', dataIndex: 'name', key: 'name', fixed: 'left' },
+    {
+      title: '班级',
+      dataIndex: 'className',
+      key: 'className',
+      sorter: (a: GradeRow, b: GradeRow) => a.className.localeCompare(b.className, 'zh-CN'),
+    },
+  ]
+  const subjectCols = table.value.subjects.map((subject) => ({
+    title: subject,
+    key: subject,
+    align: 'center' as const,
+    sorter: (a: GradeRow, b: GradeRow) => (a.scores[subject] ?? -1) - (b.scores[subject] ?? -1),
+  }))
+  const avgCol = {
+    title: '平均分',
+    dataIndex: 'average',
+    key: 'average',
+    align: 'center' as const,
+    sorter: (a: GradeRow, b: GradeRow) => (a.average ?? -1) - (b.average ?? -1),
+  }
+  return [...base, ...subjectCols, avgCol]
+})
+
+const filteredRows = computed(() => {
+  const k = keyword.value.trim().toLowerCase()
+  if (!k) return table.value.rows
+  return table.value.rows.filter(
+    (r) =>
+      r.studentNo.toLowerCase().includes(k) ||
+      r.name.toLowerCase().includes(k) ||
+      r.className.toLowerCase().includes(k),
+  )
+})
 
 async function load() {
   loading.value = true
@@ -42,51 +83,15 @@ async function load() {
 
 onMounted(load)
 
-function handleSort(key: SortKey) {
-  if (sortKey.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDir.value = 'asc'
-  }
-}
-
-function getValue(row: GradeRow, key: SortKey): string | number | null {
-  if (key === 'studentNo') return row.studentNo
-  if (key === 'name') return row.name
-  if (key === 'className') return row.className
-  if (key === 'average') return row.average
-  return row.scores[key] ?? null // 科目分数
-}
-
-const sortedRows = computed(() => {
-  const rows = [...table.value.rows]
-  rows.sort((a, b) => {
-    const av = getValue(a, sortKey.value)
-    const bv = getValue(b, sortKey.value)
-    // null 值始终排在末尾
-    if (av === null && bv === null) return 0
-    if (av === null) return 1
-    if (bv === null) return -1
-    let cmp: number
-    if (typeof av === 'number' && typeof bv === 'number') {
-      cmp = av - bv
-    } else {
-      cmp = String(av).localeCompare(String(bv), 'zh-CN')
-    }
-    return sortDir.value === 'asc' ? cmp : -cmp
-  })
-  return rows
-})
-
 async function handleSubmit(data: GradeInput) {
   await apiRequest('/grades', { method: 'POST', body: data })
+  message.success('成绩已保存')
   await load()
 }
 
-/** 将当前表格（按当前排序）导出为 Excel 文件。 */
+/** 将当前表格导出为 Excel 文件。 */
 function handleExport() {
-  const data = sortedRows.value.map((row) => {
+  const data = filteredRows.value.map((row) => {
     const record: Record<string, string | number> = {
       学号: row.studentNo,
       姓名: row.name,
@@ -106,6 +111,7 @@ function handleExport() {
   XLSX.utils.book_append_sheet(workbook, worksheet, '成绩表')
   const today = new Date().toISOString().slice(0, 10)
   XLSX.writeFile(workbook, `成绩表_${today}.xlsx`)
+  message.success('成绩表已导出')
 }
 </script>
 
@@ -120,93 +126,55 @@ function handleExport() {
             点击表头可对任意列排序 · 共 {{ table.rows.length }} 名学生 · {{ table.subjects.length }} 门科目
           </p>
         </div>
-        <div class="flex items-center gap-3">
-          <button class="btn-primary" :disabled="table.rows.length === 0" @click="handleExport">
-            <Download :size="16" /> 导出成绩
-          </button>
-          <button v-if="isAdmin" class="btn-accent" @click="modalOpen = true">
-            <Plus :size="16" /> 录入成绩
-          </button>
-        </div>
+        <a-space>
+          <a-button :disabled="table.rows.length === 0" @click="handleExport">
+            <template #icon><Download :size="16" class="inline" /></template>
+            导出成绩
+          </a-button>
+          <a-button v-if="isAdmin" type="primary" @click="modalOpen = true">
+            <template #icon><Plus :size="16" class="inline" /></template>
+            录入成绩
+          </a-button>
+        </a-space>
       </div>
 
-      <p v-if="error" class="mb-4 rounded bg-red-50 px-4 py-2 text-sm text-red-600">{{ error }}</p>
+      <a-alert v-if="error" :message="error" type="error" show-icon class="mb-4" />
 
-      <div class="overflow-hidden rounded-lg border border-navy/10 bg-white shadow-card">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-navy text-left text-cream">
-                <th
-                  v-for="col in [
-                    { key: 'studentNo', label: '学号' },
-                    { key: 'name', label: '姓名' },
-                    { key: 'className', label: '班级' },
-                  ]"
-                  :key="col.key"
-                  class="px-4 py-3 font-medium"
-                >
-                  <button class="inline-flex items-center gap-1 transition hover:text-amber" @click="handleSort(col.key)">
-                    {{ col.label }}
-                    <ChevronsUpDown v-if="sortKey !== col.key" :size="13" class="opacity-40" />
-                    <ArrowUp v-else-if="sortDir === 'asc'" :size="13" />
-                    <ArrowDown v-else :size="13" />
-                  </button>
-                </th>
-                <th v-for="subject in table.subjects" :key="subject" class="px-4 py-3 font-medium">
-                  <button class="inline-flex items-center gap-1 transition hover:text-amber" @click="handleSort(subject)">
-                    {{ subject }}
-                    <ChevronsUpDown v-if="sortKey !== subject" :size="13" class="opacity-40" />
-                    <ArrowUp v-else-if="sortDir === 'asc'" :size="13" />
-                    <ArrowDown v-else :size="13" />
-                  </button>
-                </th>
-                <th class="bg-amber/20 px-4 py-3 font-medium">
-                  <button class="inline-flex items-center gap-1 transition hover:text-amber" @click="handleSort('average')">
-                    平均分
-                    <ChevronsUpDown v-if="sortKey !== 'average'" :size="13" class="opacity-40" />
-                    <ArrowUp v-else-if="sortDir === 'asc'" :size="13" />
-                    <ArrowDown v-else :size="13" />
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="loading">
-                <td :colspan="4 + table.subjects.length" class="px-4 py-10 text-center text-navy/50">
-                  加载中...
-                </td>
-              </tr>
-              <tr v-else-if="sortedRows.length === 0">
-                <td :colspan="4 + table.subjects.length" class="px-4 py-12 text-center text-navy/50">
-                  <ClipboardList class="mx-auto mb-2 opacity-40" :size="32" />
-                  暂无成绩数据
-                </td>
-              </tr>
-              <tr
-                v-for="(row, i) in sortedRows"
-                v-else
-                :key="row.id"
-                :class="i % 2 === 0 ? 'bg-white' : 'bg-cream/60'"
-              >
-                <td class="px-4 py-3 font-medium text-navy">{{ row.studentNo }}</td>
-                <td class="px-4 py-3">{{ row.name }}</td>
-                <td class="px-4 py-3">{{ row.className }}</td>
-                <td v-for="subject in table.subjects" :key="subject" class="px-4 py-3">
-                  <span v-if="row.scores[subject] === undefined" class="text-navy/30">—</span>
-                  <span v-else :class="row.scores[subject] < 60 ? 'font-medium text-red-600' : ''">
-                    {{ row.scores[subject] }}
-                  </span>
-                </td>
-                <td class="bg-amber/10 px-4 py-3 font-semibold text-navy">
-                  <template v-if="row.average !== null">{{ row.average }}</template>
-                  <span v-else class="text-navy/30">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="mb-4">
+        <a-input-search
+          v-model:value="keyword"
+          placeholder="搜索学号、姓名或班级"
+          allow-clear
+          style="max-width: 320px"
+        />
       </div>
+
+      <a-table
+        :columns="columns"
+        :data-source="filteredRows"
+        :loading="loading"
+        row-key="id"
+        :scroll="{ x: 'max-content' }"
+        :pagination="{ pageSize: 10, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 条` }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="table.subjects.includes(column.key as string)">
+            <span v-if="(record as GradeRow).scores[column.key as string] === undefined" class="text-navy/30">—</span>
+            <span
+              v-else
+              :class="(record as GradeRow).scores[column.key as string] < 60 ? 'font-medium text-red-600' : ''"
+            >
+              {{ (record as GradeRow).scores[column.key as string] }}
+            </span>
+          </template>
+          <template v-else-if="column.key === 'average'">
+            <span v-if="(record as GradeRow).average !== null" class="font-semibold text-navy">
+              {{ (record as GradeRow).average }}
+            </span>
+            <span v-else class="text-navy/30">—</span>
+          </template>
+        </template>
+      </a-table>
     </main>
 
     <GradeFormModal
